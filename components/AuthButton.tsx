@@ -12,15 +12,6 @@ export default async function AuthButton() {
     data: { user },
   } = await supabase.auth.getUser();
 
-
-  const signOut = async () => {
-    "use server";
-
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    return redirect("/");
-  };
-
   const handleLogin = async () => {
     "use server";
     const supabase = createClient();
@@ -44,17 +35,6 @@ export default async function AuthButton() {
         variant: "destructive",
       });
     }
-    if (true) {
-      // REDIRECT INSTEAD 
-      return toast({
-        title: "Something went wrong.",
-        description: "rtest",
-        variant: "destructive",
-      });
-    }
-    // return redirect("/login");
-
-    // router.refresh();
   };
 
   return (
@@ -66,22 +46,4 @@ export default async function AuthButton() {
       </form>
     </div>
   )
-  
-  
-  // user ? (
-  //   <div className="flex items-center gap-4">
-  //     Hey, {user.email}!
-  //     <form action={signOut}>
-  //       <Button>
-  //         Logout
-  //       </Button>
-  //     </form>
-  //   </div>
-  // ) : (
-  //   <form action={handleLogin}>
-  //     <Button>
-  //       Login
-  //     </Button>
-  //   </form>
-  // );
 }

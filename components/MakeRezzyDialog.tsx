@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { date, z } from "zod"
+import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import {
@@ -26,184 +26,39 @@ import {
 import { TypographyH4, TypographyP } from "@/components/ui/typography";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
 import RezzyDatePicker from "./RezzyDatePicker";
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import _ from "lodash";
 import { toast } from "./ui/use-toast";
 import { createClient } from "@/utils/supabase/client";
 import { Database } from "@/database.types";
-import TimeSelect from "./TimeSlider";
 import { Separator } from "./ui/separator";
-import path from "path";
-
+import { formSchema, defaultValues } from "@/utils/zod/form";
+import { useRouter } from "next/navigation";
+import { generateTimeOptions } from "@/utils/time/formatting";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { CirclePlus, LucideSquarePlus, SquarePlus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type rezzyInsertType = Database['public']['Tables']["rezzys"]["Insert"];
 
-function test(data) {
-  console.log("test", data);
-  return false
-}
-
-function isTime1EarlierThanTime2(time1: string | undefined, time2: string | undefined) {
-  if (!time1 || !time2) return new Error("Time1 and Time2 must be defined");
-
-  const [hours1, minutes1, seconds1] = time1.split(":").map(Number);
-  const [hours2, minutes2, seconds2] = time2.split(":").map(Number);
-
-  if (hours1 < hours2) return true;
-  if (hours1 > hours2) return false;
-
-  if (minutes1 < minutes2) return true;
-  if (minutes1 > minutes2) return false;
-
-  return seconds1 <= seconds2;
-}
-
-const formSchema = z.object({
-  userName: z.string().min(1, { message: "Name cannot be empty" }),
-  restaurantName: z.string().optional(),
-  opentableURL: z.optional(z.string()),
-  partySize: z.number().positive().int().max(20),
-  longitude: z.number().min(-180).max(180),
-  latitude: z.number().min(-90).max(90),
-
-  date1: z.date().min(new Date(), { message: "Date cannot be in the past" }).optional().nullable(),
-  minTime1: z.string().time().optional(),
-  idealTime1: z.string().time().optional(),
-  maxTime1: z.string().time().optional(),
-
-
-  date2: z.date().min(new Date(), { message: "Date cannot be in the past" }).nullable().optional(),
-  minTime2: z.string().time().optional(),
-  idealTime2: z.string().time().optional(),
-  maxTime2: z.string().time().optional(),
-
-  date3: z.date().min(new Date(), { message: "Date cannot be in the past" }).nullable().optional(),
-  minTime3: z.string().time().optional(),
-  idealTime3: z.string().time().optional(),
-  maxTime3: z.string().time().optional(),
-}).superRefine((data, ctx) => {
-  if (test(data) || !data.restaurantName && !data.opentableURL) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Please provide either the restaurant name or the OpenTable URL",
-      path: ["restaurantName"],
-      fatal: true
-    });
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Please provide either the restaurant name or the OpenTable URL",
-      path: ["opentableURL"],
-      fatal: true 
-    });
-  }
-
-  if (data.opentableURL && !data.opentableURL.includes("opentable")) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "URL not from OpenTable",
-      path: ["opentableURL"],
-      fatal: true
-    });
-  }
-
-  const dateTime1Exists = data.date1 && data.minTime1 && data.idealTime1 && data.maxTime1;
-  const dateTime2Exists = data.date2 && data.minTime2 && data.idealTime2 && data.maxTime2;
-  const dateTime3Exists = data.date3 && data.minTime3 && data.idealTime3 && data.maxTime3;
-
-  if (!dateTime1Exists && 
-      !dateTime2Exists && 
-      !dateTime3Exists) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "At least one date and timemust be defined",
-      path: ["date1"],
-      fatal: true,
-    });
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "At least one date and time must be defined",
-      path: ["date2"],
-      fatal: true,
-    });
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "At least one date and time must be defined",
-      path: ["date3"],
-      fatal: true,
-    });
-  }
-
-  // For date-time pairs that exist, check that the minTime <= idealTime <= maxTime
-  if (dateTime1Exists && !((isTime1EarlierThanTime2(data.minTime1, data.idealTime1)) && isTime1EarlierThanTime2(data.idealTime1, data.maxTime1))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Times are not satisfiable",
-      path: ["minTime1"],
-      fatal: true
-    });
-  }
-
-  if (dateTime2Exists && !((isTime1EarlierThanTime2(data.minTime2, data.idealTime2)) && isTime1EarlierThanTime2(data.idealTime2, data.maxTime2))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Times are not satisfiable",
-      path: ["minTime2"],
-      fatal: true
-    });
-  }
-
-  if (dateTime3Exists && !((isTime1EarlierThanTime2(data.minTime3, data.idealTime3)) && isTime1EarlierThanTime2(data.idealTime3, data.maxTime3))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Times are not satisfiable",
-      path: ["minTime3"],
-      fatal: true
-    });
-  }
-    
-  if (data.longitude === 0 && data.latitude === 0) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Please provide an approximate location",
-      path: ["longitude"],
-      fatal: true
-    });
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Please provide an approximate location",
-      path: ["latitude"],
-      fatal: true
-    });
-  }
-});
-
-const defaultValues = {
-  userName: undefined,
-  restaurantName: undefined,
-  opentableURL: undefined,
-  partySize: undefined,
-  longitude: 0,
-  latitude: 0,
-  date1: null,
-  time1: undefined,
-  date2: null,
-  time2: undefined,
-  date3: null,
-  time3: undefined,
-}
-
 export default function MakeRezzyDialog() {
   const [open, setOpen] = useState(false);
+  const [date2Open, setDate2Open] = useState(false);
+  const [date3Open, setDate3Open] = useState(false);
   const times = generateTimeOptions();
-
+  const router = useRouter();
+  console.log(date2Open)
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues,
   })
 
   // Watch certain fields for revalidation so users don't see unecessary errors before submitting
-  const restaurantName = form.watch("restaurantName");
-  const opentableURL = form.watch("opentableURL");
   const date1 = form.watch("date1");
   const idealTime1 = form.watch("idealTime1");
   const maxTime1 = form.watch("maxTime1");
@@ -219,11 +74,16 @@ export default function MakeRezzyDialog() {
   const maxTime3 = form.watch("maxTime3");
   const minTime3 = form.watch("minTime3");
 
-  // Revalidate the form when certain fields are updated
-  useEffect(() => {
-    form.trigger(["restaurantName", "opentableURL"]);
-  }, [restaurantName, opentableURL, form.trigger]);
+  // Delay validation for restaurant name and OpenTable URL for 0.5 seconds after last keystroke
+  let debounceTimeout = setTimeout(() => {}, 0); 
+  function debounceValidation() {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+      form.trigger(["restaurantName", "opentableURL"]);
+    }, 500);
+  }
 
+  // Revalidate form when certain fields change
   useEffect(() => {
     form.trigger(["date1", "minTime1", "idealTime1", "maxTime1", "date2", "minTime2", "idealTime2", "maxTime2", "date3", "minTime3", "idealTime3", "maxTime3"]);
   }, [date1, idealTime1, minTime1, maxTime1, date2, idealTime2, minTime2, maxTime2, date3, idealTime3, minTime3, maxTime3, form.trigger]);
@@ -233,7 +93,6 @@ export default function MakeRezzyDialog() {
     navigator.permissions.query({ name: 'geolocation' }).then(function(permissionStatus) {
       if (permissionStatus.state === 'granted') {
           // Permission was previously granted
-          console.log('Permission granted');
           navigator.geolocation.getCurrentPosition((position) => {
             form.setValue("longitude", position.coords.longitude);
             form.setValue("latitude", position.coords.latitude);
@@ -243,7 +102,6 @@ export default function MakeRezzyDialog() {
     })
   }, []);
 
-  
 
   function formatValues(values: z.infer<typeof formSchema>, email: string): rezzyInsertType {
     // Push up dates and times
@@ -291,13 +149,11 @@ export default function MakeRezzyDialog() {
   }
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    
     console.log(form.formState.errors);
     console.log("Hello");
     console.log(values);
-    // TODO: Send form data to Supabase and call API 
     
-    // TRY TO UPLOAD TO SUPABASE REZZY. ADD DATABASE FUNCTION PREVENT THE USER FROM MAKING A REZZY IF THEY ALREADY HAVE ONE OR IF THEY ARE NOT WHITELISTED
+    // Upload Rezzy to Supabase
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -318,11 +174,11 @@ export default function MakeRezzyDialog() {
     console.log("Response from Supabase: ", data, error)
 
     if (error) {
+      console.log(error);
       if (error.message === 'duplicate key value violates unique constraint "rezzys_user_email_key"') {
         error.message = "You already have a Rezzy. Due to resource limitations, users are only allowed 1 Rezzy at a time"
       }
-
-      console.log("IN ERROR")
+      
       return toast({
         title: "Error Saving Your Rezzy",
         variant: "destructive",
@@ -330,7 +186,9 @@ export default function MakeRezzyDialog() {
       })
     }
     
-    toggleOpen();
+    setOpen(!open);
+    form.reset(defaultValues);
+    router.refresh();
     return toast({
       title: "Success!",
       description: "Rezzy has been made! You will be notified as soon as an opening appears.",
@@ -345,37 +203,24 @@ export default function MakeRezzyDialog() {
       if (!window.confirm("Are you sure you want to exit? Your changes will be lost.")) {
         return;
       }
-
       form.reset(defaultValues);
     }
     setOpen(!open);
+    setDate2Open(false);
+    setDate3Open(false);
   };
 
   const useCurrentLocation = () => {
-    var start = new Date().getTime();
-    console.log("Getting location")
     if (navigator.geolocation) {
       form.setValue("longitude", 0);
       form.setValue("latitude", 0);
-      var end = new Date().getTime();
-      console.log("Browser has geolocation. Took: ", end - start, " ms")
-      start = new Date().getTime();
 
       navigator.geolocation.getCurrentPosition((position) => {
-        end = new Date().getTime();
-        console.log("Got location. Took: ", end - start, " ms")
-        start = new Date().getTime(); 
-
         form.setValue("longitude", position.coords.longitude);
         form.setValue("latitude", position.coords.latitude);
 
-        end = new Date().getTime();
-        console.log("form values set. Took: ", end - start, " ms")
-        start = new Date().getTime();
         // Revalidate form to avoid validation warnings to user
         form.trigger(["longitude", "latitude"]);
-        end = new Date().getTime();
-        console.log("Form trigger ran. Took ", end - start, " ms");
       }, (error) => {
         return toast({
           title: "Error While Getting Location",
@@ -407,7 +252,7 @@ export default function MakeRezzyDialog() {
         <DialogHeader>
           <DialogTitle className="text-purple-400">Make Rezzy</DialogTitle>
           <DialogDescription>
-            Configure your dream reservation here. Then, Rezzy will email you as soon as an opening appears.
+            Configure your dream reservation here. Then, Rezzy will notify you as soon as an opening appears!
           </DialogDescription>
         </DialogHeader>
 
@@ -439,7 +284,7 @@ export default function MakeRezzyDialog() {
                     <FormItem className="w-1/2">
                       <FormLabel className="text-purple-400">Restaurant Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Restaurant Name" {...field} />
+                        <Input placeholder="Restaurant Name" {...field} onChange={(value) => {field.onChange(value), debounceValidation()}} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -447,15 +292,34 @@ export default function MakeRezzyDialog() {
                 />
 
                 <TypographyH4 className="mt-6">Or</TypographyH4>
-                
+
                 <FormField
                   control={form.control}
                   name="opentableURL"
                   render={({ field }) => (
-                    <FormItem className="w-1/2 mt-[8px]">
-                      <FormLabel className="text-purple-400">OpenTable URL</FormLabel>
+                    <FormItem className="mt-[8px] w-1/2">
+                      <FormLabel className="text-purple-400 flex flex-row items-center gap-1">
+                        <p>OpenTable URL</p>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger> 
+                              <InfoIcon/>
+                            </TooltipTrigger>
+                            <TooltipContent className="min-w-36 max-w-52 -translate-x-16 md:-translate-x-7">
+                              <TypographyP>
+                                The URL of your desired restaurant's OpenTable page.
+                                <br/>
+                                <br/>
+                                Here is an example: &nbsp;
+                                <a target="_blank" className="text-blue-400 no-underline hover:underline" href="https://www.opentable.com/house-of-prime-rib?corrid=f8a4c49a-3acc-4184-8757-2a7a1d464af3&p=2&sd=2024-08-24T22%3A30%3A00">House of Prime Rib</a>
+                              </TypographyP>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="OpenTable URL" {...field} />
+                        <Input className="w-full" placeholder="OpenTable URL" {...field} onChange={(value) => {field.onChange(value), debounceValidation()}}/>
                       </FormControl>
                       <FormDescription>
                       </FormDescription>
@@ -496,7 +360,26 @@ export default function MakeRezzyDialog() {
               {/* Location */}
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col gap-1 items-center">
-                  <TypographyP className="text-center text-purple-400">Restaurant Approximate Location</TypographyP>
+                  <div className="text-purple-400 flex flex-row items-center gap-1">
+                    <TypographyP className="text-center text-purple-400">Restaurant Approximate Location</TypographyP>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger> 
+                          <InfoIcon/>
+                        </TooltipTrigger>
+                        <TooltipContent className="min-w-36 max-w-52 -translate-x-16 md:-translate-x-7">
+                          <TypographyP>
+                            The approximate location of the restaurant. You can check coordinates on <a target="_blank" className="text-blue-400 no-underline hover:underline" href="https://support.google.com/maps/answer/18539?hl=en&co=GENIE.Platform%3DDesktop&oco=1">Google Maps.</a>
+                            <br/>
+                            <br/>
+                            We use your location to find restaurants near you. We never sell or store your location.
+                          </TypographyP>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  
+
                   <Button variant="outline" onClick={useCurrentLocation} size={"sm"} className="flex items-cente text-sm">
                     <LocateIcon className="h-4 w-4 mr-1" />
                     Use Current Location
@@ -534,8 +417,6 @@ export default function MakeRezzyDialog() {
                       </FormItem>
                     )}
                   />
-                  
-
                 </div>
               </div>
 
@@ -649,320 +530,315 @@ export default function MakeRezzyDialog() {
                 />
               </div>
               
-              <Separator/>
               {/* Date and Time 2 */}
-              <FormField
-                  control={form.control}
-                  name="date2"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <FormLabel className="text-purple-400">Date 2</FormLabel>
-                      <FormControl>
-                        <div className="flex flex-row items-center gap-10">
-                          <RezzyDatePicker field={field}/>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              <div className="flex flex-row gap-10 items-center w-full">
-                <FormField
-                  control={form.control}
-                  name="minTime2"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Earliest Time 2</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="idealTime2"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Ideal Time 2</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="maxTime2"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Latest Time 2</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <Separator/>
+              {date2Open ? (
+                <>
+                  <Separator/>
+                  <FormField
+                      control={form.control}
+                      name="date2"
+                      render={({ field }) => (
+                        <FormItem className="w-full">
+                          <FormLabel className="flex flex-row justify-between w-full items-center">
+                            <TypographyP className="text-purple-400">Date 2 </TypographyP>
 
-              {/* Date and Time 3 */}
-              <FormField
-                  control={form.control}
-                  name="date3"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <FormLabel className="text-purple-400">Date 3</FormLabel>
-                      <FormControl>
-                        <div className="flex flex-row items-center gap-10">
-                          <RezzyDatePicker field={field}/>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              <div className="flex flex-row gap-10 items-center w-full">
-                <FormField
-                  control={form.control}
-                  name="minTime3"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Earliest Time 3</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="idealTime3"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Ideal Time 3</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="maxTime3"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Latest Time 3</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <Separator/>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger> 
+                                  <Trash2 
+                                    onClick={() => {
+                                      setDate2Open(false);
+                                      form.setValue("date2", null);
+                                      form.setValue("minTime2", undefined);
+                                      form.setValue("idealTime2", undefined);
+                                      form.setValue("maxTime2", undefined);
+                                    }} 
+                                    className="w-5 h-5 text-red-500"/>
+                                </TooltipTrigger>
+                                <TooltipContent className="-translate-x-10 md:-translate-x-7">
+                                  <TypographyP>
+                                    Delete Date
+                                  </TypographyP>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            
+                          </FormLabel>
+                          <FormControl>
+                            <div className="flex flex-row items-center gap-10 w-1/2">
+                              <RezzyDatePicker field={field}/>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  <div className="flex flex-row gap-10 items-center w-full">
+                    <FormField
+                      control={form.control}
+                      name="minTime2"
+                      render={({ field }) => (
+                        <FormItem className="w-1/2">
+                          <div className="mb-[8px]">
+                            <FormLabel className="text-purple-400">Earliest Time 2</FormLabel>
+                          </div>
+                          
+                          <Select onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {times.map((time) => (
+                                    <SelectItem key={time.value} value={time.value}>
+                                      {time.time}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="idealTime2"
+                      render={({ field }) => (
+                        <FormItem className="w-1/2">
+                          <div className="mb-[8px]">
+                            <FormLabel className="text-purple-400">Ideal Time 2</FormLabel>
+                          </div>
+                          
+                          <Select onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {times.map((time) => (
+                                    <SelectItem key={time.value} value={time.value}>
+                                      {time.time}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="maxTime2"
+                      render={({ field }) => (
+                        <FormItem className="w-1/2">
+                          <div className="mb-[8px]">
+                            <FormLabel className="text-purple-400">Latest Time 2</FormLabel>
+                          </div>
+                          
+                          <Select onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {times.map((time) => (
+                                    <SelectItem key={time.value} value={time.value}>
+                                      {time.time}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>) : (
+                  // Add Date 2 Button
+                  <div className="flex items-center justify-center w-full">
+                    {/* Left line */}
+                    <div className="flex-grow h-px bg-purple-300"></div>
 
-              {/* Date and Time 2 */}
-              {/* <div className="flex flex-row gap-10 items-center w-full">
-                <FormField
-                  control={form.control}
-                  name="date2"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <FormLabel className="text-purple-400">Date 2</FormLabel>
-                      <FormControl>
-                        <div className="flex flex-row items-center gap-10">
-                          <RezzyDatePicker field={field}/>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    {/* Icon */}
+                    <CirclePlus 
+                      onClick={() => setDate2Open(true)} 
+                      className="mx-4 text-purple-400 hover:cursor-pointer transition-colors hover:text-purple-400/50" 
+                      size={24} 
+                    />
 
-                <FormField
-                  control={form.control}
-                  name="time2"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Time 2</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                    {/* Right line */}
+                    <div className="flex-grow h-px bg-purple-300"></div>
+                  </div>
+                )
+                
+              }
               
               {/* Date and Time 3 */}
-              {/* <div className="flex flex-row gap-10 items-center w-full">
-                <FormField
-                  control={form.control}
-                  name="date3"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <FormLabel className="text-purple-400">Date 3</FormLabel>
-                      <FormControl>
-                        <div className="flex flex-row items-center gap-10">
-                          <RezzyDatePicker field={field}/>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {(date2Open && date3Open) ? (
+                <>
+                  <Separator/>
+                  <FormField
+                    control={form.control}
+                    name="date3"
+                    render={({ field }) => (
+                      <FormItem className="w-full">
+                        <FormLabel className="text-purple-400 flex flex-row justify-between">
+                          <TypographyP>Date 3</TypographyP>
 
-                <FormField
-                  control={form.control}
-                  name="time3"
-                  render={({ field }) => (
-                    <FormItem className="w-1/2">
-                      <div className="mb-[8px]">
-                        <FormLabel className="text-purple-400">Time 3</FormLabel>
-                      </div>
-                      
-                      <Select onValueChange={field.onChange}>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger> 
+                                <Trash2 
+                                onClick={() => {
+                                  setDate3Open(false);
+                                  form.setValue("date3", null);
+                                  form.setValue("minTime3", undefined);
+                                  form.setValue("idealTime3", undefined);
+                                  form.setValue("maxTime3", undefined);
+                                }} 
+                                className="w-5 h-5 text-red-500"/>
+                              </TooltipTrigger>
+                              <TooltipContent className="-translate-x-10 md:-translate-x-7">
+                                <TypographyP>
+                                  Delete Date
+                                </TypographyP>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
+                          <div className="flex flex-row items-center gap-10 w-1/2">
+                            <RezzyDatePicker field={field}/>
+                          </div>
                         </FormControl>
-                          <SelectContent>
-                            <SelectGroup>
-                              {times.map((time) => (
-                                <SelectItem key={time.value} value={time.value}>
-                                  {time.time}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div> */}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex flex-row gap-10 items-center w-full">
+                    <FormField
+                      control={form.control}
+                      name="minTime3"
+                      render={({ field }) => (
+                        <FormItem className="w-1/2">
+                          <div className="mb-[8px]">
+                            <FormLabel className="text-purple-400">Earliest Time 3</FormLabel>
+                          </div>
+                          
+                          <Select onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {times.map((time) => (
+                                    <SelectItem key={time.value} value={time.value}>
+                                      {time.time}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="idealTime3"
+                      render={({ field }) => (
+                        <FormItem className="w-1/2">
+                          <div className="mb-[8px]">
+                            <FormLabel className="text-purple-400">Ideal Time 3</FormLabel>
+                          </div>
+                          
+                          <Select onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {times.map((time) => (
+                                    <SelectItem key={time.value} value={time.value}>
+                                      {time.time}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="maxTime3"
+                      render={({ field }) => (
+                        <FormItem className="w-1/2">
+                          <div className="mb-[8px]">
+                            <FormLabel className="text-purple-400">Latest Time 3</FormLabel>
+                          </div>
+                          
+                          <Select onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select time" />
+                              </SelectTrigger>
+                            </FormControl>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {times.map((time) => (
+                                    <SelectItem key={time.value} value={time.value}>
+                                      {time.time}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <Separator/>
+                </>
+              ) : (
+                (date2Open && (
+                  // Add Date 3 Button
+                  <div className="flex items-center justify-center w-full">
+                    {/* Left line */}
+                    <div className="flex-grow h-px bg-purple-300"></div>
+
+                    {/* Icon */}
+                    <CirclePlus 
+                      onClick={() => setDate3Open(true)} 
+                      className="mx-4 text-purple-400 hover:cursor-pointer transition-colors hover:text-purple-400/50" 
+                      size={24} 
+                    />
+
+                    {/* Right line */}
+                    <div className="flex-grow h-px bg-purple-300"></div>
+                  </div>
+                )
+
+                )
+                
+              )}
+              
 
               <div className="flex justify-end">
                 <Button type="submit">Submit</Button>
@@ -975,33 +851,6 @@ export default function MakeRezzyDialog() {
       </DialogContent>
     </Dialog>
   )
-}
-
-
-
-// Create time options in 30 minute increments for 24 hours
-const generateTimeOptions = () => {
-  const times = [];
-  let date = new Date();
-  date.setHours(0, 0, 0, 0); // Start at 12:00 AM
-
-  for (let i = 0; i < 48; i++) { // 48 intervals in 24 hours
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const period = hours >= 12 ? 'PM' : 'AM';
-
-    // Convert 24-hour format to 12-hour format
-    let adjustedHours = hours % 12;
-    adjustedHours = adjustedHours ? adjustedHours : 12; // 12-hour format should show 12, not 0
-
-    const formattedTime = `${adjustedHours.toString().padStart(2, '0')}:${minutes} ${period}`;
-    const timeValue = `${hours.toString().padStart(2, '0')}:${minutes}:00`
-    const timeOption = { time: formattedTime, value: timeValue};
-    times.push(timeOption);
-
-    date.setMinutes(date.getMinutes() + 30);
-  }
-  return times
 }
 
 function LocateIcon(props: any) {
@@ -1026,3 +875,25 @@ function LocateIcon(props: any) {
     </svg>
   )
 }
+
+function InfoIcon(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </svg>
+  )
+}
+

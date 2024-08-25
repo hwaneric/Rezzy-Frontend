@@ -26,13 +26,13 @@ export default async function Login({
       <TypographyH1 className="text-center mt-40  text-slate-700">
         Welcome to <span className="text-purple-400">Rezzy!</span>
       </TypographyH1>
-      <TypographyH3 className="text-center mb-24 text-amber-300">
+      <TypographyH3 className="text-center mb-8 text-amber-300">
         🎉 Never miss a reservation again 👀
       </TypographyH3>
-
+{/* 
       <TypographyH2 className="text-center text-slate-800">
         We are currently whitelist-only. <br/> If you have an invite, please sign-in below!
-      </TypographyH2>
+      </TypographyH2> */}
       {/* <TypographyH2 className="text-center text-slate-700 ">Please login below using Google</TypographyH2> */}
       <AuthButton/>
     </div>

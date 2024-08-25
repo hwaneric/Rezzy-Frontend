@@ -55,7 +55,9 @@ TypographyH4.displayName = "TypographyH4";
 
 export const TypographyP = React.forwardRef<HTMLParagraphElement, ComponentPropsWithoutRef<"p">>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn("leading-7 [&:not(:first-child)]:mt-6 text-slate-800", className)} {...props} />
+    // <p ref={ref} className={cn("leading-7 [&:not(:first-child)]:mt-6 text-slate-800", className)} {...props} />
+    <p ref={ref} className={cn("leading-7 text-slate-800", className)} {...props} />
+
   ),
 );
 TypographyP.displayName = "TypographyP";
