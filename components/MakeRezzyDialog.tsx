@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { z } from "zod"
+import { date, z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import {
@@ -26,7 +26,7 @@ import {
 import { TypographyH4, TypographyP } from "@/components/ui/typography";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
 import RezzyDatePicker from "./RezzyDatePicker";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import _ from "lodash";
 import { toast } from "./ui/use-toast";
 import { createClient } from "@/utils/supabase/client";
@@ -34,7 +34,7 @@ import { Database } from "@/database.types";
 import { Separator } from "./ui/separator";
 import { formSchema, defaultValues } from "@/utils/zod/form";
 import { useRouter } from "next/navigation";
-import { generateTimeOptions } from "@/utils/time/formatting";
+import { generateTimeOptions } from "@/utils/time/timeUtils";
 import {
   Tooltip,
   TooltipContent,
@@ -42,17 +42,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { CirclePlus, LucideSquarePlus, SquarePlus, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import InfoIcon from "@/icons/InfoIcon";
+import LocateIcon from "@/icons/LocateIcon";
 
 type rezzyInsertType = Database['public']['Tables']["rezzys"]["Insert"];
 
-export default function MakeRezzyDialog() {
+export default function MakeRezzyDialog({setLoading}: {setLoading: (loading: boolean) => void}) {
   const [open, setOpen] = useState(false);
   const [date2Open, setDate2Open] = useState(false);
   const [date3Open, setDate3Open] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
   const times = generateTimeOptions();
   const router = useRouter();
-  console.log(date2Open)
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues,
@@ -92,15 +94,20 @@ export default function MakeRezzyDialog() {
   useEffect(() => {
     navigator.permissions.query({ name: 'geolocation' }).then(function(permissionStatus) {
       if (permissionStatus.state === 'granted') {
-          // Permission was previously granted
-          navigator.geolocation.getCurrentPosition((position) => {
-            form.setValue("longitude", position.coords.longitude);
-            form.setValue("latitude", position.coords.latitude);
-            form.trigger(["longitude", "latitude"]);
-          });
+        // Permission was previously granted
+        navigator.geolocation.getCurrentPosition((position) => {
+          form.setValue("longitude", position.coords.longitude);
+          form.setValue("latitude", position.coords.latitude);
+          form.trigger(["longitude", "latitude"]);
+        });
       }
     })
   }, []);
+
+  // Update loading based on whether page is router.refresh()-ing or not
+  useEffect(() => {
+    setLoading(isPending)
+  }, [isPending])
 
 
   function formatValues(values: z.infer<typeof formSchema>, email: string): rezzyInsertType {
@@ -149,10 +156,6 @@ export default function MakeRezzyDialog() {
   }
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(form.formState.errors);
-    console.log("Hello");
-    console.log(values);
-    
     // Upload Rezzy to Supabase
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -171,14 +174,12 @@ export default function MakeRezzyDialog() {
       .upsert({ ...formattedValues, user_email: user.email })
       .select();
     
-    console.log("Response from Supabase: ", data, error)
-
     if (error) {
       console.log(error);
       if (error.message === 'duplicate key value violates unique constraint "rezzys_user_email_key"') {
         error.message = "You already have a Rezzy. Due to resource limitations, users are only allowed 1 Rezzy at a time"
       }
-      
+
       return toast({
         title: "Error Saving Your Rezzy",
         variant: "destructive",
@@ -188,7 +189,12 @@ export default function MakeRezzyDialog() {
     
     setOpen(!open);
     form.reset(defaultValues);
-    router.refresh();
+
+    // Refresh page to display new Rezzy
+    startTransition(() => {
+      router.refresh();
+    })
+
     return toast({
       title: "Success!",
       description: "Rezzy has been made! You will be notified as soon as an opening appears.",
@@ -545,15 +551,20 @@ export default function MakeRezzyDialog() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger> 
-                                  <Trash2 
-                                    onClick={() => {
-                                      setDate2Open(false);
-                                      form.setValue("date2", null);
-                                      form.setValue("minTime2", undefined);
-                                      form.setValue("idealTime2", undefined);
-                                      form.setValue("maxTime2", undefined);
-                                    }} 
-                                    className="w-5 h-5 text-red-500"/>
+                                  {
+                                    !date3Open && 
+                                    <Trash2 
+                                      onClick={() => {
+                                        setDate2Open(false);
+                                        form.setValue("date2", null);
+                                        form.setValue("minTime2", undefined);
+                                        form.setValue("idealTime2", undefined);
+                                        form.setValue("maxTime2", undefined);
+                                      }} 
+                                      className="w-5 h-5 text-red-500"
+                                    />
+                                  }
+                                  
                                 </TooltipTrigger>
                                 <TooltipContent className="-translate-x-10 md:-translate-x-7">
                                   <TypographyP>
@@ -692,7 +703,7 @@ export default function MakeRezzyDialog() {
                     render={({ field }) => (
                       <FormItem className="w-full">
                         <FormLabel className="text-purple-400 flex flex-row justify-between">
-                          <TypographyP>Date 3</TypographyP>
+                          <TypographyP className="text-purple-400">Date 3</TypographyP>
 
                           <TooltipProvider>
                             <Tooltip>
@@ -817,6 +828,7 @@ export default function MakeRezzyDialog() {
                   <Separator/>
                 </>
               ) : (
+                // Only show Date 3 button if Date 2 is open
                 (date2Open && (
                   // Add Date 3 Button
                   <div className="flex items-center justify-center w-full">
@@ -833,13 +845,9 @@ export default function MakeRezzyDialog() {
                     {/* Right line */}
                     <div className="flex-grow h-px bg-purple-300"></div>
                   </div>
-                )
-
-                )
-                
+                ))
               )}
               
-
               <div className="flex justify-end">
                 <Button type="submit">Submit</Button>
               </div>
@@ -853,47 +861,6 @@ export default function MakeRezzyDialog() {
   )
 }
 
-function LocateIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="2" x2="5" y1="12" y2="12" />
-      <line x1="19" x2="22" y1="12" y2="12" />
-      <line x1="12" x2="12" y1="2" y2="5" />
-      <line x1="12" x2="12" y1="19" y2="22" />
-      <circle cx="12" cy="12" r="7" />
-    </svg>
-  )
-}
 
-function InfoIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
-  )
-}
+
 

@@ -29,11 +29,6 @@ export default async function Login({
       <TypographyH3 className="text-center mb-8 text-amber-300">
         🎉 Never miss a reservation again 👀
       </TypographyH3>
-{/* 
-      <TypographyH2 className="text-center text-slate-800">
-        We are currently whitelist-only. <br/> If you have an invite, please sign-in below!
-      </TypographyH2> */}
-      {/* <TypographyH2 className="text-center text-slate-700 ">Please login below using Google</TypographyH2> */}
       <AuthButton/>
     </div>
   );

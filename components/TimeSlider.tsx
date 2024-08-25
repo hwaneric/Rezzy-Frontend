@@ -1,5 +1,3 @@
-// "use client"
-
 import * as React from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { TypographyP } from "./ui/typography";
@@ -9,23 +7,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { indexToTime } from "@/utils/time/formatting";
+import { indexToTime } from "@/utils/time/timeUtils";
 
 const TimeSlider = ({ min = 0, max = 47, values = [23, 24, 25], step = 1 }) => {
-  // const [values, setValues] = React.useState(initialValues);
-  const adjustedMin = Math.max(Math.min(...values) - 1, 0);
-  const adjustedMax = Math.min(Math.max(...values) + 1, 47);
+  const adjustedMin = Math.max(Math.min(...values) - 1, min);
+  const adjustedMax = Math.min(Math.max(...values) + 1, max);
   const timeLabels = ["Earliest", "Ideal", "Latest"];
 
   return (
     <SliderPrimitive.Root
       className="relative flex w-full touch-none select-none items-center"
       value={values}
-      // onValueChange={setValues}
       min={adjustedMin}
       max={adjustedMax}
       step={step}
-      // minStepsBetweenThumbs={1}
       disabled={true}
     >
       <SliderPrimitive.Track className="relative h-2 w-full grow rounded-full bg-slate-300">
@@ -45,9 +40,7 @@ const TimeSlider = ({ min = 0, max = 47, values = [23, 24, 25], step = 1 }) => {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        </SliderPrimitive.Thumb>
-        
-        
+        </SliderPrimitive.Thumb>        
       ))}
     </SliderPrimitive.Root>
   );

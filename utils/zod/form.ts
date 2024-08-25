@@ -1,11 +1,7 @@
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { isTime1EarlierThanTime2 } from "@/utils/time/formatting"
+import { isTime1EarlierThanTime2 } from "@/utils/time/timeUtils"
 
-function test(data) {
-  console.log("test", data);
-  return false
-}
 export const defaultValues = {
   userName: undefined,
   restaurantName: undefined,
@@ -52,7 +48,7 @@ export const formSchema = z.object({
   maxTime3: z.string().time().optional(),
 })
 .superRefine((data, ctx) => {
-  if (test(data) || !data.restaurantName && !data.opentableURL) {
+  if (!data.restaurantName && !data.opentableURL) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Please provide either the restaurant name or the OpenTable URL",
@@ -122,6 +118,30 @@ export const formSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Times are not satisfiable",
       path: ["minTime3"],
+    });
+  }
+
+  
+  // Reject incomplete dates-time pairs
+  if (!dateTime1Exists && (data.date1 || data.minTime1 || data.idealTime1 || data.maxTime1)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Incomplete date-time",
+      path: ["date1"],
+    });
+  }
+  if (!dateTime2Exists && (data.date2 || data.minTime2 || data.idealTime2 || data.maxTime2)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Incomplete date-time",
+      path: ["date2"],
+    });
+  }
+  if (!dateTime3Exists && (data.date3 || data.minTime3 || data.idealTime3 || data.maxTime3)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Incomplete date-time",
+      path: ["date3"],
     });
   }
     

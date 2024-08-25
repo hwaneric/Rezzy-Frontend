@@ -1,24 +1,29 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
-import { redirect, useRouter } from "next/navigation";
-import { TypographyH1, TypographyH2, TypographyH3, TypographyH4, TypographyP } from "@/components/ui/typography";
-import LocationEnabler from "@/components/LocationEnabler";
-import MakeRezzyDialog from "@/components/MakeRezzyDialog";
+import { useRouter } from "next/navigation";
+import { TypographyH4, TypographyP } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { Database } from "@/database.types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { User as UserIcon } from "lucide-react"
-import { formatDate, formatTime, timeToIndex } from "@/utils/time/formatting";
+import { formatDate, formatTime, timeToIndex } from "@/utils/time/timeUtils";
 import { Separator } from "@/components/ui/separator";
 import TimeSlider from "@/components/TimeSlider";
+import { useEffect, useTransition } from "react";
 
 
 type rezzyType = Database['public']['Tables']["rezzys"]["Row"];
 
-export default function RezzyDisplayCard({ rezzy }: { rezzy: rezzyType }) {
+export default function RezzyDisplayCard({ rezzy, setLoading }: { rezzy: rezzyType, setLoading: (loading: boolean) => void }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  // When router.refresh() finishes, set loading to false
+  useEffect(() => {
+    setLoading(isPending)
+  }, [isPending])
 
   const handleCancelRezzy = async () => {
     const supabase = createClient();
@@ -36,7 +41,9 @@ export default function RezzyDisplayCard({ rezzy }: { rezzy: rezzyType }) {
       });
     }
 
-    router.refresh()
+    startTransition(() => {
+      router.refresh()
+    })
     return toast({
       title: "Success",
       description: "Reservation cancelled successfully",
@@ -44,8 +51,9 @@ export default function RezzyDisplayCard({ rezzy }: { rezzy: rezzyType }) {
 
   }
 
+
   return (
-    <Card className="lg:w-[55%] md:w-5/6 mb-56">
+    <Card className={`lg:w-[55%] md:w-5/6 mb-12`}>
       <CardHeader className="mt-0">
         <div className="flex flex-row gap-8 items-center">
           <CardTitle className="mt-0 text-purple-400 underline">
