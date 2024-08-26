@@ -1,6 +1,6 @@
-<p align="center">
+<h1 align="center">
  Rezzy: Make Reservations Easy
-</p>
+</h1>
 
 Welcome to Rezzy, a platform that will automatically notify new openings or cancelations appear for your favorite booked-out reservations. This repository is the frontend UI for the Rezzy service.
 
