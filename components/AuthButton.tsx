@@ -19,7 +19,8 @@ export default async function AuthButton() {
     const { error, data } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `http://localhost:3000/auth/callback`,
+        // redirectTo: `http://localhost:3000/auth/callback`,
+        redirectTo: `https://make-rezzy.vercel.app/auth/callback`,
       }
     });
 
