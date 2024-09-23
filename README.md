@@ -2,7 +2,7 @@
  Rezzy: Make Reservations Easy
 </h1>
 
-Welcome to Rezzy, a platform that will automatically notify new openings or cancelations appear for your favorite booked-out reservations. This repository is the frontend UI for the Rezzy service.
+Welcome to Rezzy, a platform that will automatically notify new openings or cancelations appear for your favorite booked-out reservations. This repository is the frontend UI for the Rezzy service. Check out the deployed frontend at: https://make-rezzy.vercel.app/login
 
 
 ## Running Locally ## 
